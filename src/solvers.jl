@@ -69,9 +69,9 @@ function step!(solver::GLKSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     # println("Max E: ", maximum(E.values), " Min E: ", minimum(E.values))
 
     #Quadrature scaling factor
-    # c = eigmax(Hv, tol=1e-1)
+    c = eigmax(Hv, tol=1e-1)
     # println("c: ", c)
-    c = λ≤1 ? 1. : sqrt(λ)
+    # c = λ≤1 ? 1. : sqrt(λ)
 
     #Shifts
     shifts = c^2*solver.quad_nodes .+ λ
@@ -312,7 +312,7 @@ function step!(solver::DirectSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T,
     λ = max(min(1e15, M*g_norm), 1e-15)
 
     #Update search direction
-    solver.p .-= sqrt(Matrix(Hv)+λ*I)\g
+    solver.p .= -sqrt(Matrix(Hv)+λ*I)\g
 
     return
 end
