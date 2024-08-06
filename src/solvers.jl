@@ -69,7 +69,7 @@ function step!(solver::GLKSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     # println("Max E: ", maximum(E.values), " Min E: ", minimum(E.values))
 
     #Quadrature scaling factor
-    # c = eigmax(Hv, tol=1e-1) + sqrt(λ)
+    # c = eigmax(Hv, tol=1e-1) #+ sqrt(λ)
     c = λ≤1 ? 1. : sqrt(λ)
     
     println("c: ", c)
@@ -121,7 +121,7 @@ function hvp_power(solver::GCKSolver)
     return 2
 end
 
-function GCKSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, quad_order::I=61, krylov_order::I=0) where {I<:Integer, T<:AbstractFloat}
+function GCKSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, quad_order::I=25, krylov_order::I=0) where {I<:Integer, T<:AbstractFloat}
 
     #Quadrature
     nodes, weights = gausschebyshevt(quad_order)
@@ -156,11 +156,12 @@ function step!(solver::GCKSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     # β = 1.0
     # β = λ > 1 ? λ : one(λ) 
     # β = eigmax(Hv, tol=1e-6)
-    E = eigen(Matrix(Hv))
-    println(E.values)
-    println("λ: ", λ)
-    β = sum(E.values)/length(g) + λ
-    println("β: ", β)
+    # E = eigen(Matrix(Hv))
+    # println(E.values)
+    # println("λ: ", λ)
+    # β = sum(E.values)/length(g) + λ
+    # println("β: ", β)
+    β = 100
 
     #Shifts and scalings
     shifts = (λ-β) .* solver.quad_nodes .+ (λ+β)
@@ -173,8 +174,9 @@ function step!(solver::GCKSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     #CG Solves
     cg_lanczos_shale!(solver.krylov_solver, Hv, -g, shifts, scales, itmax=solver.krylov_order, timemax=time_limit, atol=cg_atol, rtol=cg_rtol)
 
-    if sum(solver.krylov_solver.converged) != length(scales)
-        println("WARNING: Solver failure")
+    converged = sum(solver.krylov_solver.converged)
+    if converged != length(shifts)
+        println("WARNING: Solver failed, only ", converged, " converged")
     end
 
     push!(stats.krylov_iterations, solver.krylov_solver.stats.niter)
