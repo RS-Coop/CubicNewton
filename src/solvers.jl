@@ -148,20 +148,20 @@ function step!(solver::GCKSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     solver.p .= 0.0
 
     #Quadrature constant
-    #=
-    This could be set to some good estimate for where eigenvalues of Hv are clustered.
-    - Mean=Trace/dim
-    - Maximum
-    - Median
-    =#
     # β = 1.0
     # β = λ > 1 ? λ : one(λ)
-    β = eigmax(Hv, tol=1e-6)
-    # β = β^2 #NOTE: Sometimes β^2 works better, e.g. HAHN1LS
-    # β = sqrt(eigmax(Hv, tol=1e-6))
-    # E = eigen(Matrix(Hv))
-    # β = sum(E.values)/length(g)
+
+    #Maximum eigenvalue of H
+    # β = eigmax(Hv, tol=1e-6)
+    # β = β^2 #NOTE: Sometimes β^2 works better, e.g. HAHN1LS, BROWNAL, ARGLINB, KSSLS
+    # β = sqrt(β)
+
+    #Mean eigenvalue of H^2
+    β = eigmean(Hv, tol=1e-6)
+    
+    #
     # β = λ≤1 ? 1. : sqrt(λ)
+    
     # println("β: ", β)
 
     #Shifts and scalings

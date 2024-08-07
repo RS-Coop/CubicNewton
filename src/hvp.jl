@@ -38,7 +38,7 @@ end
 Form full matrix
 =#
 function Base.Matrix(Hv::HvpOperator{T}) where {T}
-	n = size(Hv)[1]
+	n = size(Hv, 1)
 	H = Matrix{T}(undef, n, n)
 
 	ei = zeros(T, n)
@@ -156,4 +156,31 @@ function eigmax(Hv::H; tol::T=1e-6, maxiter::I=Int(ceil(sqrt(size(Hv, 1))))) whe
 	end
 
 	return abs(θ)
+end
+
+#=
+In-place approximation of Hessian^2 spectrum mean, i.e. trace/n
+
+https://github.com/JuliaLinearAlgebra/IterativeSolvers.jl/blob/0b2f1c5d352069df1bc891750087deda2d14cc9d/src/simple.jl#L58-L63
+
+Input:
+	Hv :: HvpOperator
+=#
+function eigmean(Hv::H; tol::T=1e-6, maxiter::I=Int(ceil(sqrt(size(Hv, 1))))) where {H<:HvpOperator, T<:AbstractFloat, I<:Integer}
+	n = size(Hv, 1)
+
+	trace = zero(T)
+	ei = zeros(T, n)
+	res = similar(ei)
+
+	@inbounds for i = 1:n
+		ei[i] = one(T)
+
+		apply!(res, Hv, ei)
+		trace += dot(res, res)
+
+		ei[i] = zero(T)
+	end
+	
+	return trace/n
 end
