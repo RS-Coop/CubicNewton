@@ -16,9 +16,9 @@ Shifted CG Lanczos with Gauss-Laguerre quadrature.
 =#
 mutable struct GLKSolver{T<:AbstractFloat, I<:Integer, S<:AbstractVector{T}}
     krylov_solver::CgLanczosShiftSolver #Krylov solver
-    krylov_order::I #maximum Krylov subspace size
-    quad_nodes::S #quadrature nodes
-    quad_weights::S #quadrature weights
+    const krylov_order::I #maximum Krylov subspace size
+    const quad_nodes::S #quadrature nodes
+    const quad_weights::S #quadrature weights
     p::S #search direction
 end
 
@@ -26,7 +26,7 @@ function hvp_power(solver::GLKSolver)
     return 2
 end
 
-function GLKSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, quad_order::I=31, krylov_order::I=0) where {I<:Integer, T<:AbstractFloat}
+function GLKSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, quad_order::I=61, krylov_order::I=0) where {I<:Integer, T<:AbstractFloat}
 
     #Quadrature
     nodes, weights = gausslaguerre(quad_order, 0.0, reduced=true)
@@ -42,7 +42,7 @@ function GLKSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, quad
     - Rescaling weights
     - Squaring nodes
     =#
-    @. weights = (2/pi)*weights*exp(nodes)
+    @. weights = (2.0/pi)*weights*exp(nodes)
     @. nodes = nodes^2
 
     #Krylov solver
@@ -63,7 +63,7 @@ function step!(solver::GLKSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     # println("λ: ", λ)
 
     #Reset search direction
-    solver.p .= 0
+    solver.p .= 0.0
 
     # E = eigen(Matrix(Hv))
     # println("Max E: ", maximum(E.values), " Min E: ", minimum(E.values))
@@ -112,9 +112,9 @@ Shifted and scaled CG Lanczos with Gauss-Chebyshev quadrature.
 =#
 mutable struct GCKSolver{T<:AbstractFloat, I<:Integer, S<:AbstractVector{T}}
     krylov_solver::CgLanczosShaleSolver #Krylov solver
-    krylov_order::I #maximum Krylov subspace size
-    quad_nodes::S #quadrature nodes
-    quad_weights::S #quadrature weights
+    const krylov_order::I #maximum Krylov subspace size
+    const quad_nodes::S #quadrature nodes
+    const quad_weights::S #quadrature weights
     p::S #search direction
 end
 
@@ -122,11 +122,11 @@ function hvp_power(solver::GCKSolver)
     return 2
 end
 
-function GCKSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, quad_order::I=31, krylov_order::I=0) where {I<:Integer, T<:AbstractFloat}
+function GCKSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, quad_order::I=61, krylov_order::I=0) where {I<:Integer, T<:AbstractFloat}
 
     #Quadrature
     nodes, weights = gausschebyshevt(quad_order)
-    @. weights *= 2/pi #global scaling
+    @. weights *= 2.0/pi #global scaling
 
     #Krylov solver
     solver = CgLanczosShaleSolver(dim, dim, quad_order, type)
@@ -145,7 +145,7 @@ function step!(solver::GCKSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     λ = max(min(1e15, M*g_norm), 1e-15)
 
     #Reset search direction
-    solver.p .= 0
+    solver.p .= 0.0
 
     #Quadrature constant
     #=
@@ -164,7 +164,7 @@ function step!(solver::GCKSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
 
     #Shifts and scalings
     shifts = (λ-β) .* solver.quad_nodes .+ (λ+β)
-    scales = solver.quad_nodes .+ 1
+    scales = solver.quad_nodes .+ 1.0
 
     #Tolerance
     cg_atol = 1e-6
@@ -197,7 +197,7 @@ end
 Krylov based low-rank approximation.
 =#
 mutable struct KrylovSolver{I<:Integer, T<:AbstractFloat, S<:AbstractVector{T}}
-    rank::I #target rank
+    const rank::I #target rank
     krylov_solver::Lanczos #Krylov solver
     # krylovdim::I #maximum Krylov subspace size
     # maxiter::I #maximum restarts
@@ -326,8 +326,8 @@ end
 Locally-Optimal Block Preconditioned Conjugate Gradient (LOBPCG) based low-rank approximation
 =#
 mutable struct LOBPCGSolver{I<:Integer, T<:AbstractFloat, S<:AbstractVector{T}}
-    rank::I
-    maxiter::I
+    const rank::I
+    const maxiter::I
     p::S #search direction
 end
 
@@ -375,7 +375,7 @@ Find search direction using shifted CG Lanczos
 =#
 mutable struct RNSolver{T<:AbstractFloat, I<:Integer, S<:AbstractVector{T}}
     krylov_solver::CgLanczosShiftSolver #krylov inverse mat vec solver
-    krylov_order::I #maximum Krylov subspace size
+    const krylov_order::I #maximum Krylov subspace size
     p::S #search direction
 end
 
@@ -426,8 +426,8 @@ Adaptive Regularization with Cubics (ARC) solver using shifted CG Lanczos
 =#
 mutable struct ARCSolver{T<:AbstractFloat, I<:Integer, S<:AbstractVector{T}}
     krylov_solver::CgLanczosShiftSolver #Krylov solver
-    krylov_order::I #maximum Krylov subspace size
-    shifts::S #shifts
+    const krylov_order::I #maximum Krylov subspace size
+    const shifts::S #shifts
     p::S #search direction
 end
 

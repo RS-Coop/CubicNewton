@@ -13,13 +13,13 @@ SFN optimizer struct.
 =#
 mutable struct SFNOptimizer{T1<:Real, T2<:AbstractFloat, S} <: Optimizer
     M::T1 #hessian lipschitz constant
-    ϵ::T2 #regularization minimum
     solver::S #search direction solver
-    linesearch::Bool #whether to use linsearch
     η::T2 #step-size
-    α::T2 #linesearch factor
-    atol::T2 #absolute gradient norm tolerance
-    rtol::T2 #relative gradient norm tolerance
+    const ϵ::T2 #regularization minimum
+    const linesearch::Bool #whether to use linsearch
+    const α::T2 #linesearch factor
+    const atol::T2 #absolute gradient norm tolerance
+    const rtol::T2 #relative gradient norm tolerance
 end
 
 #=
@@ -38,7 +38,7 @@ Input:
     atol :: absolute gradient norm tolerance
     rtol :: relative gradient norm tolerance
 =#
-function SFNOptimizer(dim::I, solver::Symbol=:KrylovSolver; M::T1=1e-8, ϵ::T2=eps(Float64), linesearch::Bool=false, η::T2=1.0, α::T2=0.5, atol::T2=1e-5, rtol::T2=1e-6) where {I<:Integer, T1<:Real, T2<:AbstractFloat}
+function SFNOptimizer(dim::I, solver::Symbol=:KrylovSolver; M::T1=1.0, ϵ::T2=eps(Float64), linesearch::Bool=false, η::T2=1.0, α::T2=0.5, atol::T2=1e-5, rtol::T2=1e-6) where {I<:Integer, T1<:Real, T2<:AbstractFloat}
     
     #Regularization
     @assert 0≤M && 0≤ϵ
@@ -50,7 +50,7 @@ function SFNOptimizer(dim::I, solver::Symbol=:KrylovSolver; M::T1=1e-8, ϵ::T2=e
 
     solver = eval(solver)(dim)
 
-    return SFNOptimizer(M, ϵ, solver, linesearch, η, α, atol, rtol)
+    return SFNOptimizer(M, solver, η, ϵ, linesearch, α, atol, rtol)
 end
 
 ########################################################
@@ -61,13 +61,13 @@ ARC optimizer struct.
 mutable struct ARCOptimizer{T1<:Real, T2<:AbstractFloat, S} <: Optimizer
     M::T1 #
     solver::S #search direction solver
-    linesearch::Bool #
-    η1::T2 #
-    η2::T2 #
-    γ1::T2 #
-    γ2::T2 #
-    atol::T2 #absolute gradient norm tolerance
-    rtol::T2 #relative gradient norm tolerance
+    const linesearch::Bool
+    const η1::T2 #
+    const η2::T2 #
+    const γ1::T2 #
+    const γ2::T2 #
+    const atol::T2 #absolute gradient norm tolerance
+    const rtol::T2 #relative gradient norm tolerance
 end
 
 #=
