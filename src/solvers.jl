@@ -157,8 +157,10 @@ function step!(solver::GCKSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     # β = 1.0
     # β = λ > 1 ? λ : one(λ)
     β = eigmax(Hv, tol=1e-6)
+    # β = β^2 #NOTE: Sometimes β^2 works better, e.g. HAHN1LS
     # β = sqrt(eigmax(Hv, tol=1e-6))
-    # β = sum(E.values)/length(g) + λ
+    # E = eigen(Matrix(Hv))
+    # β = sum(E.values)/length(g)
     # β = λ≤1 ? 1. : sqrt(λ)
     # println("β: ", β)
 
@@ -167,8 +169,8 @@ function step!(solver::GCKSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     scales = solver.quad_nodes .+ 1.0
 
     #Tolerance
-    cg_atol = 1e-6
-    cg_rtol = 1e-6
+    cg_atol = sqrt(eps(T))
+    cg_rtol = sqrt(eps(T))
 
     #CG Solves
     cg_lanczos_shale!(solver.krylov_solver, Hv, -g, shifts, scales, itmax=solver.krylov_order, timemax=time_limit, atol=cg_atol, rtol=cg_rtol)

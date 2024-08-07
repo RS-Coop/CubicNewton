@@ -25,7 +25,7 @@ LinearAlgebra.ishermitian(Hv::HvpOperator) = true
 LinearAlgebra.issymmetric(Hv::HvpOperator) = true
 
 #=
-In place update of RHvpOperator
+In place update of HvpOperator
 Input:
 =#
 function reset!(Hv::HvpOperator)
