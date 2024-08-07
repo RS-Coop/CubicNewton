@@ -69,10 +69,11 @@ function step!(solver::GLKSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     # println("Max E: ", maximum(E.values), " Min E: ", minimum(E.values))
 
     #Quadrature scaling factor
-    # c = eigmax(Hv, tol=1e-1) #+ sqrt(λ)
-    c = λ≤1 ? 1. : sqrt(λ)
+    c = eigmax(Hv, tol=1e-6)
+    # c = sqrt(eigmax(Hv, tol=1e-6)) #+ sqrt(λ)
+    # c = λ≤1 ? 1. : sqrt(λ)
     
-    println("c: ", c)
+    # println("c: ", c)
 
     #Shifts
     shifts = c^2*solver.quad_nodes .+ λ
@@ -121,7 +122,7 @@ function hvp_power(solver::GCKSolver)
     return 2
 end
 
-function GCKSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, quad_order::I=25, krylov_order::I=0) where {I<:Integer, T<:AbstractFloat}
+function GCKSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, quad_order::I=31, krylov_order::I=0) where {I<:Integer, T<:AbstractFloat}
 
     #Quadrature
     nodes, weights = gausschebyshevt(quad_order)
@@ -154,14 +155,12 @@ function step!(solver::GCKSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     - Median
     =#
     # β = 1.0
-    # β = λ > 1 ? λ : one(λ) 
-    # β = eigmax(Hv, tol=1e-6)
-    # E = eigen(Matrix(Hv))
-    # println(E.values)
-    # println("λ: ", λ)
+    # β = λ > 1 ? λ : one(λ)
+    β = eigmax(Hv, tol=1e-6)
+    # β = sqrt(eigmax(Hv, tol=1e-6))
     # β = sum(E.values)/length(g) + λ
+    # β = λ≤1 ? 1. : sqrt(λ)
     # println("β: ", β)
-    β = 100
 
     #Shifts and scalings
     shifts = (λ-β) .* solver.quad_nodes .+ (λ+β)
@@ -182,8 +181,9 @@ function step!(solver::GCKSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     push!(stats.krylov_iterations, solver.krylov_solver.stats.niter)
 
     #Update search direction
-    for i in eachindex(scales)
+    for i in eachindex(shifts)
         @inbounds solver.p .+= solver.quad_weights[i]*solver.krylov_solver.x[i]
+        # @inbounds solver.p .-= solver.quad_weights[i]*(scales[i]*Matrix(Hv)+shifts[i]*I)\g
     end
 
     solver.p .*= sqrt(β)

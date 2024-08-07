@@ -156,7 +156,7 @@ function iterate!(opt::O, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time_limit::T) 
         if opt.linesearch && !search!(opt, stats, x, f, fval, grads, g_norm, Hv)
             break
         else
-            println("P-norm: ", norm(opt.solver.p))
+            # println("P-norm: ", norm(opt.solver.p))
             x .+= opt.solver.p
         end
         ##########

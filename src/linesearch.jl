@@ -66,7 +66,7 @@ function search!(opt::SFNOptimizer, stats::Stats, x::S, f::F, fval::T, g::S, g_n
 
     #Update regularization
     # println("Accepted η: ", η)
-    opt.M = max(min(1e8, opt.M/η^2), 1e-15)
+    opt.M = max(min(1e8, opt.M/η^2), 1e-8)
     # println("Updated M: ", opt.M)
 
     return success
