@@ -165,8 +165,11 @@ https://github.com/JuliaLinearAlgebra/IterativeSolvers.jl/blob/0b2f1c5d352069df1
 
 Input:
 	Hv :: HvpOperator
+
+NOTE: This is assuming the power is 2
+NOTE: Don't need the tolerance as this is exact
 =#
-function eigmean(Hv::H; tol::T=1e-6, maxiter::I=Int(ceil(sqrt(size(Hv, 1))))) where {H<:HvpOperator, T<:AbstractFloat, I<:Integer}
+function eigmean(Hv::HvpOperator{T}) where {T}
 	n = size(Hv, 1)
 
 	trace = zero(T)
@@ -181,6 +184,6 @@ function eigmean(Hv::H; tol::T=1e-6, maxiter::I=Int(ceil(sqrt(size(Hv, 1))))) wh
 
 		ei[i] = zero(T)
 	end
-	
+
 	return trace/n
 end

@@ -8,6 +8,7 @@ using FastGaussQuadrature: gausslaguerre, gausschebyshevt
 using Krylov: CgLanczosShiftSolver, cg_lanczos_shift!, CgLanczosSolver, cg_lanczos!, CgLanczosShaleSolver, cg_lanczos_shale!
 using KrylovKit: eigsolve, Lanczos, KrylovDefaults
 using IterativeSolvers: lobpcg
+using Statistics
 
 ########################################################
 
@@ -26,7 +27,7 @@ function hvp_power(solver::GLKSolver)
     return 2
 end
 
-function GLKSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, quad_order::I=61, krylov_order::I=0) where {I<:Integer, T<:AbstractFloat}
+function GLKSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, quad_order::I=150, krylov_order::I=0) where {I<:Integer, T<:AbstractFloat}
 
     #Quadrature
     nodes, weights = gausslaguerre(quad_order, 0.0, reduced=true)
@@ -122,7 +123,7 @@ function hvp_power(solver::GCKSolver)
     return 2
 end
 
-function GCKSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, quad_order::I=61, krylov_order::I=0) where {I<:Integer, T<:AbstractFloat}
+function GCKSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, quad_order::I=150, krylov_order::I=0) where {I<:Integer, T<:AbstractFloat}
 
     #Quadrature
     nodes, weights = gausschebyshevt(quad_order)
@@ -157,7 +158,11 @@ function step!(solver::GCKSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     # β = sqrt(β)
 
     #Mean eigenvalue of H^2
-    β = eigmean(Hv, tol=1e-6)
+    β = eigmean(Hv)
+
+    #Other statistics
+    # E = eigen(Matrix(Hv))
+    # β = median(E.values)
     
     #
     # β = λ≤1 ? 1. : sqrt(λ)
