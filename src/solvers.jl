@@ -158,7 +158,8 @@ function step!(solver::GCKSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     # β = sqrt(β)
 
     #Mean eigenvalue of H^2
-    β = eigmean(Hv)
+    # β = eigmean(Hv)
+    β = eigmean_hutch(Hv)
 
     #Other statistics
     # E = eigen(Matrix(Hv))

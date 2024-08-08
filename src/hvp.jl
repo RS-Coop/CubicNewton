@@ -103,6 +103,17 @@ function LinearAlgebra.mul!(result::AbstractVector, Hv::H, v::S) where {S<:Abstr
 end
 
 #=
+
+=#
+function apply!(result::AbstractMatrix, Hv::H, V::M) where {M<:AbstractMatrix{<:AbstractFloat}, H<:HvpOperator}
+	for i=1:size(V,2)
+		@views apply!(result[:,i], Hv, V[:,i])
+	end
+
+	return nothing
+end
+
+#=
 In-place matrix-matrix multiplcation with HvpOperator
 
 WARNING: Default construction for Hv is power=1
@@ -127,6 +138,8 @@ https://github.com/JuliaLinearAlgebra/IterativeSolvers.jl/blob/0b2f1c5d352069df1
 
 Input:
 	Hv :: HvpOperator
+
+NOTE: This uses apply! not mul!, so it is always computing for H
 =#
 function eigmax(Hv::H; tol::T=1e-6, maxiter::I=Int(ceil(sqrt(size(Hv, 1))))) where {H<:HvpOperator, T<:AbstractFloat, I<:Integer}
 	x0 = rand(eltype(Hv), size(Hv, 1))
@@ -167,7 +180,6 @@ Input:
 	Hv :: HvpOperator
 
 NOTE: This is assuming the power is 2
-NOTE: Don't need the tolerance as this is exact
 =#
 function eigmean(Hv::HvpOperator{T}) where {T}
 	n = size(Hv, 1)
@@ -184,6 +196,28 @@ function eigmean(Hv::HvpOperator{T}) where {T}
 
 		ei[i] = zero(T)
 	end
+
+	return trace/n
+end
+
+function eigmean_hutch(Hv::HvpOperator{T}, m=Int(ceil(sqrt(size(Hv, 1))))) where{T}
+	m = m÷3
+	n = size(Hv, 1)
+
+	trace = 0.0
+
+	S = rand([-1.,1.], n, m)
+	G = rand([-1.,1.], n, m)
+
+	Q = Matrix(qr(Hv*S).Q)
+
+	temp = Matrix{T}(undef, n, m)
+
+	apply!(temp, Hv, Q)
+	trace += tr(temp'*temp)
+
+	apply!(temp, Hv, (I-Q*Q')*G)
+	trace += (3.0/m)*tr(temp'*temp)
 
 	return trace/n
 end
