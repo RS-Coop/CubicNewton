@@ -99,27 +99,26 @@ function iterate!(opt::O, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time_limit::T) 
     g_norm = norm(grads)
 
     #Estimate regularization
-    #NOTE: Not doing this anymore because it is usually a large overestimate
-    # if opt.linesearch && opt.estimate_M
-    #     ζ = randn(length(x))
-    #     D = norm(ζ)^2
+    if opt.linesearch && isnan(opt.M)
+        ζ = randn(length(x))
+        D = norm(ζ)^2
 
-    #     g2 = similar(grads)
-    #     fg!(g2, x+ζ)
+        g2 = similar(grads)
+        fg!(g2, x+ζ)
 
-    #     if any(isnan.(g2)) #this is a bit odd but fixes a particular issue with MISRA1CLS in CUTEst
-    #         opt.M = 1e15
-    #     else
-    #         apply!(ζ, Hv, ζ) 
-    #         ζ .= g2-grads-ζ
+        if any(isnan.(g2)) #this is a bit odd but fixes a particular issue with MISRA1CLS in CUTEst
+            opt.M = 1e15
+        else
+            apply!(ζ, Hv, ζ) 
+            ζ .= g2-grads-ζ
 
-    #         opt.M = min(1e8, 2*norm(ζ)/(D))
-    #     end
+            opt.M = min(1e8, 2*norm(ζ)/(D))
+        end
 
-    #     g2 = nothing #mark for collection
+        g2 = nothing #mark for collection
 
-    #     println("M Estimate: ", opt.M)
-    # end
+        # println("M Estimate: ", opt.M)
+    end
 
     #Tolerance
     tol = opt.atol + opt.rtol*g_norm

@@ -27,7 +27,7 @@ function hvp_power(solver::GLKSolver)
     return 2
 end
 
-function GLKSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, quad_order::I=150, krylov_order::I=0) where {I<:Integer, T<:AbstractFloat}
+function GLKSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, quad_order::I=61, krylov_order::I=0) where {I<:Integer, T<:AbstractFloat}
 
     #Quadrature
     nodes, weights = gausslaguerre(quad_order, 0.0, reduced=true)
@@ -70,18 +70,25 @@ function step!(solver::GLKSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     # println("Max E: ", maximum(E.values), " Min E: ", minimum(E.values))
 
     #Quadrature scaling factor
-    c = eigmax(Hv, tol=1e-6)
+    # c = eigmax(Hv, tol=1e-6)
+    c = eigmean_hutch(Hv)
     # c = sqrt(eigmax(Hv, tol=1e-6)) #+ sqrt(λ)
     # c = λ≤1 ? 1. : sqrt(λ)
     
     # println("c: ", c)
 
     #Shifts
-    shifts = c^2*solver.quad_nodes .+ λ
+    shifts = c*solver.quad_nodes .+ λ
     
     #Tolerance
-    cg_atol = sqrt(eps(T))
-    cg_rtol = sqrt(eps(T))
+    # cg_atol = sqrt(eps(T))
+    # cg_rtol = sqrt(eps(T))
+
+    ζ = 0.5
+    ξ = T(0.01)
+
+    cg_atol = max(sqrt(eps(T)), min(ξ, ξ*g_norm^(1+ζ)))
+    cg_rtol = max(sqrt(eps(T)), min(ξ, ξ*g_norm^(ζ)))
 
     #CG solves
     cg_lanczos_shift!(solver.krylov_solver, Hv, -g, shifts, itmax=solver.krylov_order, timemax=time_limit, atol=cg_atol, rtol=cg_rtol)
@@ -101,7 +108,7 @@ function step!(solver::GLKSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
 
     # solver.p .*= g_norm
 
-    solver.p .*= c
+    solver.p .*= sqrt(c)
 
     return
 end
@@ -123,7 +130,7 @@ function hvp_power(solver::GCKSolver)
     return 2
 end
 
-function GCKSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, quad_order::I=150, krylov_order::I=0) where {I<:Integer, T<:AbstractFloat}
+function GCKSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, quad_order::I=61, krylov_order::I=0) where {I<:Integer, T<:AbstractFloat}
 
     #Quadrature
     nodes, weights = gausschebyshevt(quad_order)
@@ -153,7 +160,7 @@ function step!(solver::GCKSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     # β = λ > 1 ? λ : one(λ)
 
     #Maximum eigenvalue of H
-    # β = eigmax(Hv, tol=1e-6)
+    # β = eigmax(Hv, tol=1e-6)^2
     # β = β^2 #NOTE: Sometimes β^2 works better, e.g. HAHN1LS, BROWNAL, ARGLINB, KSSLS
     # β = sqrt(β)
 
@@ -175,8 +182,14 @@ function step!(solver::GCKSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     scales = solver.quad_nodes .+ 1.0
 
     #Tolerance
-    cg_atol = sqrt(eps(T))
-    cg_rtol = sqrt(eps(T))
+    # cg_atol = sqrt(eps(T))
+    # cg_rtol = sqrt(eps(T))
+
+    ζ = 0.5
+    ξ = T(0.01)
+
+    cg_atol = max(sqrt(eps(T)), min(ξ, ξ*g_norm^(1+ζ)))
+    cg_rtol = max(sqrt(eps(T)), min(ξ, ξ*g_norm^(ζ)))
 
     #CG Solves
     cg_lanczos_shale!(solver.krylov_solver, Hv, -g, shifts, scales, itmax=solver.krylov_order, timemax=time_limit, atol=cg_atol, rtol=cg_rtol)

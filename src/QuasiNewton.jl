@@ -32,7 +32,7 @@ function rsfn!(x::S, f::F; mode::Symbol, itmax::I, time_limit::T2, M::T1=1.0, at
 	return stats
 end
 
-function rsfn!(x::S, f::F1, fg!::F2, H::L; mode::Symbol, itmax::I, time_limit::T2, M::T1=1.0, atol::T2=1e-5, rtol::T2=1e-6, linesearch::Bool=false) where {T1<:Real, T2<:AbstractFloat, S<:AbstractVector{T2}, F1, F2, L, I}
+function rsfn!(x::S, f::F1, fg!::F2, H::L; mode::Symbol, itmax::I, time_limit::T2, M::T1=NaN, atol::T2=1e-5, rtol::T2=1e-6, linesearch::Bool=false) where {T1<:Real, T2<:AbstractFloat, S<:AbstractVector{T2}, F1, F2, L, I}
 	opt = SFNOptimizer(size(x,1), mode, M=M, linesearch=linesearch, atol=atol, rtol=rtol)
 
 	stats = minimize!(opt, x, f, fg!, H, itmax=itmax, time_limit=time_limit)

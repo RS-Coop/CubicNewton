@@ -168,7 +168,7 @@ function eigmax(Hv::H; tol::T=1e-6, maxiter::I=Int(ceil(sqrt(size(Hv, 1))))) whe
 		rmul!(x0, one(eltype(x0))/norm(x0))
 	end
 
-	return abs(θ)
+	return abs(θ)^Hv.power
 end
 
 #=
