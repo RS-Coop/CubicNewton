@@ -184,6 +184,12 @@ NOTE: This is assuming the power is 2
 function eigmean(Hv::HvpOperator{T}) where {T}
 	n = size(Hv, 1)
 
+	if 100<n && n≤10000
+		return hutch(Hv, Int(ceil(sqrt(n))))
+	elseif 10000<n
+		return hutch(Hv, Int(ceil(log(n))))
+	end
+
 	trace = zero(T)
 	ei = zeros(T, n)
 	res = similar(ei)
@@ -200,7 +206,7 @@ function eigmean(Hv::HvpOperator{T}) where {T}
 	return trace/n
 end
 
-function eigmean_hutch(Hv::HvpOperator{T}, m=Int(ceil(sqrt(size(Hv, 1))))) where{T}
+function hutch(Hv::HvpOperator{T}, m::I) where{T, I}
 	m = m÷3
 	n = size(Hv, 1)
 
@@ -216,7 +222,7 @@ function eigmean_hutch(Hv::HvpOperator{T}, m=Int(ceil(sqrt(size(Hv, 1))))) where
 	apply!(temp, Hv, Q)
 	trace += tr(temp'*temp)
 
-	apply!(temp, Hv, (I-Q*Q')*G)
+	apply!(temp, Hv, G-Q*(Q'*G))
 	trace += (3.0/m)*tr(temp'*temp)
 
 	return trace/n

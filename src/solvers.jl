@@ -71,9 +71,7 @@ function step!(solver::GLKSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
 
     #Quadrature scaling factor
     # c = eigmax(Hv, tol=1e-6)
-    c = eigmean_hutch(Hv)
-    # c = sqrt(eigmax(Hv, tol=1e-6)) #+ sqrt(λ)
-    # c = λ≤1 ? 1. : sqrt(λ)
+    c = eigmean(Hv)
     
     # println("c: ", c)
 
@@ -166,7 +164,7 @@ function step!(solver::GCKSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
 
     #Mean eigenvalue of H^2
     # β = eigmean(Hv)
-    β = eigmean_hutch(Hv)
+    β = eigmean(Hv)
 
     #Other statistics
     # E = eigen(Matrix(Hv))
