@@ -8,7 +8,7 @@ using FastGaussQuadrature: gausslaguerre, gausschebyshevt
 using Krylov: CgLanczosShiftSolver, cg_lanczos_shift!, CgLanczosSolver, cg_lanczos!, CgLanczosShaleSolver, cg_lanczos_shale!
 using KrylovKit: eigsolve, Lanczos, KrylovDefaults
 using IterativeSolvers: lobpcg
-using Statistics
+# using RandomizedPreconditioners: NystromPreconditioner
 
 ########################################################
 
@@ -61,22 +61,31 @@ function step!(solver::GLKSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     
     #Regularization
     λ = max(min(1e15, M*g_norm), 1e-15)
+
     # println("λ: ", λ)
 
     #Reset search direction
     solver.p .= 0.0
 
-    # E = eigen(Matrix(Hv))
-    # println("Max E: ", maximum(E.values), " Min E: ", minimum(E.values))
-
     #Quadrature scaling factor
-    # c = eigmax(Hv, tol=1e-6)
-    c = eigmean(Hv)
+    # β = eigmax(Hv, tol=1e-6)
+    β = eigmean(Hv)
     
-    # println("c: ", c)
+    # println("β: ", β)
+
+    #Preconditioning
+    P = I
+
+    # E = eigen(Matrix(Hv))
+    # @. E.values = pinv(E.values)
+    # P = Matrix(E)
+
+    # k = Int(ceil(log(size(Hv, 1))))
+    # r = Int(ceil(1.5*k))
+    # P = NystromPreconditionerInverse(NystromSketch(Hv, k, r), 0)
 
     #Shifts
-    shifts = c*solver.quad_nodes .+ λ
+    shifts = β*solver.quad_nodes .+ λ
     
     #Tolerance
     # cg_atol = sqrt(eps(T))
@@ -89,7 +98,7 @@ function step!(solver::GLKSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     cg_rtol = max(sqrt(eps(T)), min(ξ, ξ*g_norm^(ζ)))
 
     #CG solves
-    cg_lanczos_shift!(solver.krylov_solver, Hv, -g, shifts, itmax=solver.krylov_order, timemax=time_limit, atol=cg_atol, rtol=cg_rtol)
+    cg_lanczos_shift!(solver.krylov_solver, Hv, -g, shifts, M=P, itmax=solver.krylov_order, timemax=time_limit, atol=cg_atol, rtol=cg_rtol)
 
     converged = sum(solver.krylov_solver.converged)
     if converged != length(shifts)
@@ -100,13 +109,10 @@ function step!(solver::GLKSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
 
     #Update search direction
     for i in eachindex(shifts)
-        @inbounds solver.p .+= solver.quad_weights[i]*solver.krylov_solver.x[i] #NOTE: Should we multiply by c outside of loop?
-        # @inbounds solver.p -= solver.quad_weights[i]*((Matrix(Hv)+shifts[i]*I)\(g ./g_norm))
+        @inbounds solver.p .+= solver.quad_weights[i]*solver.krylov_solver.x[i]
     end
 
-    # solver.p .*= g_norm
-
-    solver.p .*= sqrt(c)
+    solver.p .*= sqrt(β)
 
     return
 end
@@ -150,31 +156,28 @@ function step!(solver::GCKSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     #Regularization
     λ = max(min(1e15, M*g_norm), 1e-15)
 
+    # println("λ: ", λ)
+
     #Reset search direction
     solver.p .= 0.0
 
-    #Quadrature constant
-    # β = 1.0
-    # β = λ > 1 ? λ : one(λ)
-
-    #Maximum eigenvalue of H
-    # β = eigmax(Hv, tol=1e-6)^2
-    # β = β^2 #NOTE: Sometimes β^2 works better, e.g. HAHN1LS, BROWNAL, ARGLINB, KSSLS
-    # β = sqrt(β)
-
-    #Mean eigenvalue of H^2
-    # β = eigmean(Hv)
+    #Quadrature scaling factor
+    # β = eigmax(Hv, tol=1e-6)
     β = eigmean(Hv)
 
-    #Other statistics
-    # E = eigen(Matrix(Hv))
-    # β = median(E.values)
-    
-    #
-    # β = λ≤1 ? 1. : sqrt(λ)
-    
     # println("β: ", β)
 
+    #Preconditioning
+    P = I
+
+    # E = eigen(Matrix(Hv))
+    # @. E.values = pinv(E.values)
+    # P = Matrix(E)
+
+    # k = Int(ceil(log(size(Hv, 1))))
+    # r = Int(ceil(1.5*k))
+    # P = NystromPreconditionerInverse(NystromSketch(Hv, k, r), 0)
+    
     #Shifts and scalings
     shifts = (λ-β) .* solver.quad_nodes .+ (λ+β)
     scales = solver.quad_nodes .+ 1.0
@@ -190,7 +193,7 @@ function step!(solver::GCKSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     cg_rtol = max(sqrt(eps(T)), min(ξ, ξ*g_norm^(ζ)))
 
     #CG Solves
-    cg_lanczos_shale!(solver.krylov_solver, Hv, -g, shifts, scales, itmax=solver.krylov_order, timemax=time_limit, atol=cg_atol, rtol=cg_rtol)
+    cg_lanczos_shale!(solver.krylov_solver, Hv, -g, shifts, scales, M=P, itmax=solver.krylov_order, timemax=time_limit, atol=cg_atol, rtol=cg_rtol)
 
     converged = sum(solver.krylov_solver.converged)
     if converged != length(shifts)
@@ -202,7 +205,6 @@ function step!(solver::GCKSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     #Update search direction
     for i in eachindex(shifts)
         @inbounds solver.p .+= solver.quad_weights[i]*solver.krylov_solver.x[i]
-        # @inbounds solver.p .-= solver.quad_weights[i]*(scales[i]*Matrix(Hv)+shifts[i]*I)\g
     end
 
     solver.p .*= sqrt(β)
@@ -383,6 +385,72 @@ function step!(solver::LOBPCGSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T,
     @. cache1 *= r.λ
     mul!(solver.p, r.X, cache1)
     @. solver.p += inv(sqrt(λ))*(-g-cache2)
+
+    return
+end
+
+########################################################
+
+#=
+Randomized Nystrom low-rank eigendecomposition.
+
+NOTE: This uses the positive-definite Nystrom approximation which implicitly uses H^2
+=#
+mutable struct NystromSolver{I<:Integer, T<:AbstractFloat, S<:AbstractVector{T}}
+    k::I #rank
+    r::I #sketch size
+    p::S #search direction
+end
+
+function hvp_power(solver::NystromSolver)
+    return 2
+end
+
+function NystromSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, k::I=Int(ceil(sqrt(dim))), r::I=Int(ceil(1.5*k))) where {I<:Integer, T<:AbstractFloat}
+    return NystromSolver(k, r, type(undef, dim))
+end
+
+#NOTE: https://github.com/tjdiamandis/RandomizedPreconditioners.jl/blob/main/src/sketch.jl
+function NystromSketch(A::H, k::Int, r::Int) where {H<:HvpOperator}
+    n = size(A, 1)
+    Y = zeros(n, r)
+
+    Ω = 1/sqrt(n) * randn(n, r)
+    mul!(Y, A, Ω)
+    
+    ν = sqrt(n)*eps(norm(Y))
+    @. Y = Y + ν*Ω
+
+    Z = zeros(r, r)
+    mul!(Z, Ω', Y)
+    
+    B = Y / cholesky(Hermitian(Z), check=false).U
+    U, Σ, _ = svd(B)
+    D = max.(0, Σ.^2 .- ν)
+
+    return U[:,1:k], D[1:k]
+end
+
+function step!(solver::NystromSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
+
+    #Regularization
+    λ = max(min(1e15, M*g_norm), 1e-15)
+
+    #Nystrom approximation
+    U, D = NystromSketch(Hv, solver.k, solver.r)
+    @. D = pinv(sqrt(D+λ))
+
+    #Temporary memory
+    #NOTE: These could be part of the solver struct
+    cache1 = S(undef, solver.k)
+    cache2 = similar(g)
+
+    #Update search direction
+    mul!(cache1, U', -g)
+    mul!(cache2, U, cache1)
+    @. cache1 *= D
+    mul!(solver.p, U, cache1)
+    @. solver.p += pinv(sqrt(λ))*(-g-cache2)
 
     return
 end
