@@ -230,11 +230,16 @@ function hvp_power(solver::KrylovSolver)
 end
 
 function KrylovSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}) where {I<:Integer, T<:AbstractFloat}
-    rank = Int(ceil(sqrt(dim)))
-    k = Int(ceil(rank*log(rank)))
+    if dim≤10000
+        k = Int(ceil(sqrt(dim)))
+    else
+        k = Int(ceil(log(dim)))
+    end
 
-    krylov_solver = Lanczos(krylovdim=k, maxiter=1, tol=1e-1, orth=KrylovDefaults.orth, eager=false, verbosity=0)
-    return KrylovSolver(rank, krylov_solver, type(undef, dim))
+    r = Int(ceil(1.5*k))
+
+    krylov_solver = Lanczos(krylovdim=r, maxiter=1, tol=1e-1, orth=KrylovDefaults.orth, eager=false, verbosity=0)
+    return KrylovSolver(k, krylov_solver, type(undef, dim))
 
     # return KrylovSolver(rank, k, 1, type(undef, dim))
 end
@@ -256,20 +261,16 @@ function step!(solver::KrylovSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T,
     # D = D[1:info.converged]
     # V = V[1:info.converged]
 
-    @. D = pinv(sqrt(D^2+λ))
     V = stack(V)
 
     #Temporary memory
-    #NOTE: These could be part of the solver struct
-    cache1 = S(undef, length(D))
-    cache2 = similar(g)
+    #NOTE: This could be part of the solver struct
+    cache = S(undef, length(D))
 
-    #Update search direction
-    mul!(cache1, V', -g)
-    mul!(cache2, V, cache1)
-    @. cache1 *= D
-    mul!(solver.p, V, cache1)
-    @. solver.p += inv(sqrt(λ))*(-g-cache2)
+    mul!(cache, U', -g)
+    @. cache *= sqrt(D[end]+λ)*inv(sqrt(D+λ)) - one(T)
+    mul!(solver.p, U, cache)
+    @. solver.p += -g 
 
     return
 end
@@ -299,16 +300,83 @@ function step!(solver::EigenSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, 
     #Eigendecomposition
     E = eigen(Matrix(Hv))
 
-    #Update eigenvalues
-    @. E.values = pinv(sqrt(E.values^2+λ))
-
     #Temporary memory
     cache = similar(g)
 
     #Update search direction
     mul!(cache, E.vectors', -g)
-    @. cache *= E.values
+    @. cache *= pinv(sqrt(E.values^2+λ))
     mul!(solver.p, E.vectors, cache)
+
+    return
+end
+
+########################################################
+
+#=
+Randomized Nystrom low-rank eigendecomposition.
+
+NOTE: This uses the positive-definite Nystrom approximation which implicitly uses H^2
+=#
+mutable struct NystromSolver{I<:Integer, T<:AbstractFloat, S<:AbstractVector{T}}
+    const k::I #rank
+    const r::I #sketch size
+    p::S #search direction
+end
+
+function hvp_power(solver::NystromSolver)
+    return 2
+end
+
+function NystromSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}) where {I<:Integer, T<:AbstractFloat}
+    if dim≤10000
+        k = Int(ceil(sqrt(dim)))
+    else
+        k = Int(ceil(log(dim)))
+    end
+
+    r = Int(ceil(1.5*k))
+    
+    return NystromSolver(k, r, type(undef, dim))
+end
+
+#NOTE: https://github.com/tjdiamandis/RandomizedPreconditioners.jl/blob/main/src/sketch.jl
+function NystromSketch(A::H, k::Int, r::Int) where {H<:HvpOperator}
+    n = size(A, 1)
+    Y = zeros(n, r)
+
+    Ω = 1/sqrt(n) * randn(n, r)
+    mul!(Y, A, Ω)
+    
+    ν = sqrt(n)*eps(norm(Y))
+    @. Y = Y + ν*Ω
+
+    Z = zeros(r, r)
+    mul!(Z, Ω', Y)
+    
+    B = Y / cholesky(Hermitian(Z), check=false).U
+    U, Σ, _ = svd(B)
+    D = max.(0, Σ.^2 .- ν)
+
+    return U[:,1:k], D[1:k]
+end
+
+function step!(solver::NystromSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
+
+    #Regularization
+    λ = max(min(1e15, M*g_norm), 1e-15)
+
+    #Nystrom approximation
+    U, D = NystromSketch(Hv, solver.k, solver.r)
+
+    #Temporary memory
+    #NOTE: This could be part of the solver struct
+    cache = S(undef, solver.k)
+
+    mul!(cache, U', -g)
+    @. cache *= sqrt(D[end]+λ)*inv(sqrt(D+λ)) - one(T)
+    mul!(solver.p, U, cache)
+    @. solver.p += -g 
 
     return
 end
@@ -357,10 +425,15 @@ function hvp_power(solver::LOBPCGSolver)
 end
 
 function LOBPCGSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}) where {I<:Integer, T<:AbstractFloat}
-    rank = Int(ceil(sqrt(dim)))
-    k = Int(ceil(rank*log(rank)))
+    if dim≤10000
+        k = Int(ceil(sqrt(dim)))
+    else
+        k = Int(ceil(log(dim)))
+    end
 
-    return LOBPCGSolver(rank, k, type(undef, dim))
+    r = Int(ceil(1.5*k))
+
+    return LOBPCGSolver(rank, r, type(undef, dim))
 end
 
 function step!(solver::LOBPCGSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
@@ -371,86 +444,14 @@ function step!(solver::LOBPCGSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T,
     #Low-rank eigendecomposition
     r = lobpcg(Hv, true, solver.rank, maxiter=solver.maxiter)
 
-    #Update eigenvalues
-    @. r.λ = pinv(sqrt(r.λ+λ))
-
     #Temporary memory
-    #NOTE: These could be part of the solver struct
-    cache1 = S(undef, length(D))
-    cache2 = similar(g)
+    #NOTE: This could be part of the solver struct
+    cache = S(undef, length(D))
 
-    #Update search direction
-    mul!(cache1, r.X', -g)
-    mul!(cache2, r.X, cache1)
-    @. cache1 *= r.λ
-    mul!(solver.p, r.X, cache1)
-    @. solver.p += inv(sqrt(λ))*(-g-cache2)
-
-    return
-end
-
-########################################################
-
-#=
-Randomized Nystrom low-rank eigendecomposition.
-
-NOTE: This uses the positive-definite Nystrom approximation which implicitly uses H^2
-=#
-mutable struct NystromSolver{I<:Integer, T<:AbstractFloat, S<:AbstractVector{T}}
-    k::I #rank
-    r::I #sketch size
-    p::S #search direction
-end
-
-function hvp_power(solver::NystromSolver)
-    return 2
-end
-
-function NystromSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, k::I=Int(ceil(sqrt(dim))), r::I=Int(ceil(1.5*k))) where {I<:Integer, T<:AbstractFloat}
-    return NystromSolver(k, r, type(undef, dim))
-end
-
-#NOTE: https://github.com/tjdiamandis/RandomizedPreconditioners.jl/blob/main/src/sketch.jl
-function NystromSketch(A::H, k::Int, r::Int) where {H<:HvpOperator}
-    n = size(A, 1)
-    Y = zeros(n, r)
-
-    Ω = 1/sqrt(n) * randn(n, r)
-    mul!(Y, A, Ω)
-    
-    ν = sqrt(n)*eps(norm(Y))
-    @. Y = Y + ν*Ω
-
-    Z = zeros(r, r)
-    mul!(Z, Ω', Y)
-    
-    B = Y / cholesky(Hermitian(Z), check=false).U
-    U, Σ, _ = svd(B)
-    D = max.(0, Σ.^2 .- ν)
-
-    return U[:,1:k], D[1:k]
-end
-
-function step!(solver::NystromSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
-
-    #Regularization
-    λ = max(min(1e15, M*g_norm), 1e-15)
-
-    #Nystrom approximation
-    U, D = NystromSketch(Hv, solver.k, solver.r)
-    @. D = pinv(sqrt(D+λ))
-
-    #Temporary memory
-    #NOTE: These could be part of the solver struct
-    cache1 = S(undef, solver.k)
-    cache2 = similar(g)
-
-    #Update search direction
-    mul!(cache1, U', -g)
-    mul!(cache2, U, cache1)
-    @. cache1 *= D
-    mul!(solver.p, U, cache1)
-    @. solver.p += pinv(sqrt(λ))*(-g-cache2)
+    mul!(cache, r.X', -g)
+    @. cache *= sqrt(r.λ[end]+λ)*inv(sqrt(r.λ+λ)) - one(T)
+    mul!(solver.p, r.X, cache)
+    @. solver.p += -g 
 
     return
 end
