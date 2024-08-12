@@ -267,9 +267,9 @@ function step!(solver::KrylovSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T,
     #NOTE: This could be part of the solver struct
     cache = S(undef, length(D))
 
-    mul!(cache, U', -g)
+    mul!(cache, V', -g)
     @. cache *= sqrt(D[end]+λ)*inv(sqrt(D+λ)) - one(T)
-    mul!(solver.p, U, cache)
+    mul!(solver.p, V, cache)
     @. solver.p += -g 
 
     return
@@ -376,7 +376,7 @@ function step!(solver::NystromSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T
     mul!(cache, U', -g)
     @. cache *= sqrt(D[end]+λ)*inv(sqrt(D+λ)) - one(T)
     mul!(solver.p, U, cache)
-    @. solver.p += -g 
+    @. solver.p += -g
 
     return
 end
