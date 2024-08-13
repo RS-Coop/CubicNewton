@@ -88,14 +88,14 @@ function step!(solver::GLKSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     shifts = β*solver.quad_nodes .+ λ
     
     #Tolerance
-    # cg_atol = sqrt(eps(T))
-    # cg_rtol = sqrt(eps(T))
+    cg_atol = sqrt(eps(T))
+    cg_rtol = sqrt(eps(T))
 
-    ζ = 0.5
-    ξ = T(0.01)
+    # ζ = 0.5
+    # ξ = T(0.01)
 
-    cg_atol = max(sqrt(eps(T)), min(ξ, ξ*g_norm^(1+ζ)))
-    cg_rtol = max(sqrt(eps(T)), min(ξ, ξ*g_norm^(ζ)))
+    # cg_atol = max(sqrt(eps(T)), min(ξ, ξ*g_norm^(1+ζ)))
+    # cg_rtol = max(sqrt(eps(T)), min(ξ, ξ*g_norm^(ζ)))
 
     #CG solves
     cg_lanczos_shift!(solver.krylov_solver, Hv, -g, shifts, M=P, itmax=solver.krylov_order, timemax=time_limit, atol=cg_atol, rtol=cg_rtol)
@@ -183,14 +183,14 @@ function step!(solver::GCKSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     scales = solver.quad_nodes .+ 1.0
 
     #Tolerance
-    # cg_atol = sqrt(eps(T))
-    # cg_rtol = sqrt(eps(T))
+    cg_atol = sqrt(eps(T))
+    cg_rtol = sqrt(eps(T))
 
-    ζ = 0.5
-    ξ = T(0.01)
+    # ζ = 0.5
+    # ξ = T(0.01)
 
-    cg_atol = max(sqrt(eps(T)), min(ξ, ξ*g_norm^(1+ζ)))
-    cg_rtol = max(sqrt(eps(T)), min(ξ, ξ*g_norm^(ζ)))
+    # cg_atol = max(sqrt(eps(T)), min(ξ, ξ*g_norm^(1+ζ)))
+    # cg_rtol = max(sqrt(eps(T)), min(ξ, ξ*g_norm^(ζ)))
 
     #CG Solves
     cg_lanczos_shale!(solver.krylov_solver, Hv, -g, shifts, scales, M=P, itmax=solver.krylov_order, timemax=time_limit, atol=cg_atol, rtol=cg_rtol)

@@ -6,6 +6,12 @@ Line-search procedures.
 
 ########################################################
 
+function search!(opt::SFNOptimizer, stats::Stats, x::S, f::F, fval::T, g::S, g_norm::T, Hv::H) where {F, T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
+    return search_M!(opt, stats, x, f, fval, g, g_norm, Hv)
+end
+
+########################################################
+
 #=
 In place SFN step-size line-search
 
@@ -17,7 +23,7 @@ Input:
     λ :: regularization
     α :: float in (0,1)
 =#
-function search!(opt::SFNOptimizer, stats::Stats, x::S, f::F, fval::T, g::S, g_norm::T, Hv::H) where {F, T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
+function search_η!(opt::SFNOptimizer, stats::Stats, x::S, f::F, fval::T, g::S, g_norm::T, Hv::H) where {F, T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
 
     #Setup
     p = opt.solver.p
@@ -68,6 +74,43 @@ function search!(opt::SFNOptimizer, stats::Stats, x::S, f::F, fval::T, g::S, g_n
     # println("Accepted η: ", η)
     opt.M = max(min(1e8, opt.M/η^2), 1e-8)
     # println("Updated M: ", opt.M)
+
+    return success
+end
+
+########################################################
+
+#=
+In place SFN regularization line-search
+
+Input:
+    x :: current iterate
+    p :: search direction
+    f :: scalar valued function
+    fval :: current function value
+    λ :: regularization
+    α :: float in (0,1)
+=#
+function search_M!(opt::SFNOptimizer, stats::Stats, x::S, f::F, fval::T, g::S, g_norm::T, Hv::H) where {F, T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
+
+    #Setup
+    p = opt.solver.p
+    p_norm = norm(p)
+    success = true
+    λ = max(min(1e15, opt.M*g_norm), 1e-15)
+
+    #Test search direction, select negative gradient if too small
+    p_norm = norm(opt.solver.p)
+
+    #Target decrement
+    dec = p_norm^2*sqrt(λ)*(1-3*sqrt(3))/6
+
+    if p_norm ≥ eps(T) && f(x+p)-fval ≤ dec
+        opt.M *= opt.α #decrease regularization
+    else
+        opt.M /= opt.α #increase regularization
+        success = false
+    end
 
     return success
 end
