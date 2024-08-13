@@ -105,11 +105,13 @@ function search_M!(opt::SFNOptimizer, stats::Stats, x::S, f::F, fval::T, g::S, g
     #Target decrement
     dec = p_norm^2*sqrt(λ)*(1-3*sqrt(3))/6
 
-    if p_norm ≥ eps(T) && f(x+p)-fval ≤ dec
-        opt.M *= opt.α #decrease regularization
-    else
-        opt.M /= opt.α #increase regularization
-        success = false
+    if p_norm ≥ eps(T) && f(x+p)-fval ≤ dec #success
+        opt.M = max(opt.α*opt.M, 1e-8) #decrease regularization
+        
+    else #failure
+        opt.M = min(opt.M/opt.α, 1e8) #increase regularization
+
+        opt.solver.p .= zero(T)
     end
 
     return success
