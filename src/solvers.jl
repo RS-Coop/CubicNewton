@@ -170,8 +170,11 @@ function step!(solver::GCKSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     #Preconditioning
     P = I
 
-    # E = eigen(Matrix(Hv))
-    # @. E.values = pinv(E.values)
+    # E = eigen(Matrix(Hv), sortby=x->-1/abs(x))
+    # β = mean(E.values[1:end-2])
+    # println(E.values)
+    # println("β: ", β)
+    # @. E.values = pinv(sqrt(E.values))
     # P = Matrix(E)
 
     # k = Int(ceil(log(size(Hv, 1))))
@@ -205,6 +208,7 @@ function step!(solver::GCKSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     #Update search direction
     for i in eachindex(shifts)
         @inbounds solver.p .+= solver.quad_weights[i]*solver.krylov_solver.x[i]
+        # @inbounds solver.p .-= solver.quad_weights[i]*inv(scales[i]*P+shifts[i]*I)*g
     end
 
     solver.p .*= sqrt(β)
@@ -341,17 +345,17 @@ function NystromSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}) 
 end
 
 #NOTE: https://github.com/tjdiamandis/RandomizedPreconditioners.jl/blob/main/src/sketch.jl
-function NystromSketch(A::H, k::Int, r::Int) where {H<:HvpOperator}
-    n = size(A, 1)
-    Y = zeros(n, r)
+function NystromSketch(Hv::HvpOperator{T}, k::Int, r::Int) where {T}
+    n = size(Hv, 1)
+    Y = Matrix{T}(undef, n, r)
+    Z = Matrix{T}(undef, r, r)
 
     Ω = 1/sqrt(n) * randn(n, r)
-    mul!(Y, A, Ω)
+    mul!(Y, Hv, Ω)
     
     ν = sqrt(n)*eps(norm(Y))
     @. Y = Y + ν*Ω
 
-    Z = zeros(r, r)
     mul!(Z, Ω', Y)
     
     B = Y / cholesky(Hermitian(Z), check=false).U

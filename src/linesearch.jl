@@ -7,7 +7,7 @@ Line-search procedures.
 ########################################################
 
 function search!(opt::SFNOptimizer, stats::Stats, x::S, f::F, fval::T, g::S, g_norm::T, Hv::H) where {F, T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
-    return search_M!(opt, stats, x, f, fval, g, g_norm, Hv)
+    return search_η!(opt, stats, x, f, fval, g, g_norm, Hv)
 end
 
 ########################################################
@@ -107,7 +107,7 @@ function search_M!(opt::SFNOptimizer, stats::Stats, x::S, f::F, fval::T, g::S, g
 
     if p_norm ≥ eps(T) && f(x+p)-fval ≤ dec #success
         opt.M = max(opt.α*opt.M, 1e-8) #decrease regularization
-        
+
     else #failure
         opt.M = min(opt.M/opt.α, 1e8) #increase regularization
 
