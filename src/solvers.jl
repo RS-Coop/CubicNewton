@@ -500,7 +500,7 @@ function step!(solver::RNSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, tim
     
     cg_lanczos_shift!(solver.krylov_solver, Hv, -g, [λ], itmax=solver.krylov_order, timemax=time_limit, atol=cg_atol, rtol=cg_rtol)
 
-    if sum(solver.krylov_solver.converged) != length(shifts)
+    if sum(solver.krylov_solver.converged) != 1
         println("WARNING: Solver failure")
     end
 

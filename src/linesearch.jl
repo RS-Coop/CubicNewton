@@ -173,6 +173,7 @@ function search!(opt::ARCOptimizer, stats::Stats, x::S, f::F, fval::T, g::S, g_n
         #successful
         else
             success = true
+            # println("Shift: ", opt.solver.shifts[i])
 
             #step
             opt.solver.p .= opt.solver.krylov_solver.x[j]
