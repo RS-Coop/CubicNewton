@@ -54,7 +54,6 @@ function search_η!(opt::SFNOptimizer, stats::Stats, x::S, f::F, fval::T, g::S, 
         stats.f_evals += 1
 
         if f(x+p)-fval ≤ dec
-            # println("Reduction: ", f(x+p)-fval, " Dec: ", dec)
             break
         else
             η *= opt.α #reduce step-size
@@ -71,9 +70,7 @@ function search_η!(opt::SFNOptimizer, stats::Stats, x::S, f::F, fval::T, g::S, 
     end
 
     #Update regularization
-    # println("Accepted η: ", η)
     opt.M = max(min(1e8, opt.M/η^2), 1e-8)
-    # println("Updated M: ", opt.M)
 
     return success
 end

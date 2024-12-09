@@ -106,7 +106,7 @@ function iterate!(opt::O, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time_limit::T) 
         g2 = similar(grads)
         fg!(g2, x+ζ)
 
-        if any(isnan.(g2)) #this is a bit odd but fixes a particular issue with MISRA1CLS in CUTEst
+        if any(isnan.(g2))
             opt.M = 1e15
         else
             apply!(ζ, Hv, ζ) 
@@ -116,8 +116,6 @@ function iterate!(opt::O, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time_limit::T) 
         end
 
         g2 = nothing #mark for collection
-
-        # println("M Estimate: ", opt.M)
     end
 
     #Tolerance
@@ -157,7 +155,6 @@ function iterate!(opt::O, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time_limit::T) 
         if opt.linesearch && !search!(opt, stats, x, f, fval, grads, g_norm, Hv)
             break
         else
-            # println("P-norm: ", norm(opt.solver.p))
             x .+= opt.solver.p
         end
         ##########
