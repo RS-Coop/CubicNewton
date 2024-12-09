@@ -185,22 +185,22 @@ function eigmean(Hv::HvpOperator{T}) where {T}
 	n = size(Hv, 1)
 
 	if 100<n && n≤10000
-		return hutch(Hv, Int(ceil(sqrt(n))))
+		trace = hutch(Hv, Int(ceil(sqrt(n))))
 	elseif 10000<n
-		return hutch(Hv, Int(ceil(log(n))))
-	end
+		trace = hutch(Hv, Int(ceil(log(n))))
+	else
+		trace = zero(T)
+		ei = zeros(T, n)
+		res = similar(ei)
 
-	trace = zero(T)
-	ei = zeros(T, n)
-	res = similar(ei)
+		@inbounds for i = 1:n
+			ei[i] = one(T)
 
-	@inbounds for i = 1:n
-		ei[i] = one(T)
+			apply!(res, Hv, ei)
+			trace += dot(res, res)
 
-		apply!(res, Hv, ei)
-		trace += dot(res, res)
-
-		ei[i] = zero(T)
+			ei[i] = zero(T)
+		end
 	end
 
 	return trace/n
@@ -225,5 +225,5 @@ function hutch(Hv::HvpOperator{T}, m::I) where{T, I}
 	apply!(temp, Hv, G-Q*(Q'*G))
 	trace += (3.0/m)*tr(temp'*temp)
 
-	return trace/n
+	return trace
 end

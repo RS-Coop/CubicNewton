@@ -5,7 +5,7 @@ SFN step solvers.
 =#
 
 using FastGaussQuadrature: gausslaguerre, gausschebyshevt
-using Krylov: CgLanczosShiftSolver, cg_lanczos_shift!, CgLanczosSolver, cg_lanczos!, CgLanczosShaleSolver, cg_lanczos_shale!
+using Krylov: CgLanczosShiftSolver, cg_lanczos_shift!, CgLanczosSolver, cg_lanczos!, CgLanczosShaleSolver, cg_lanczos_shale!, hermitian_lanczos
 using KrylovKit: eigsolve, Lanczos, KrylovDefaults
 using IterativeSolvers: lobpcg
 # using RandomizedPreconditioners: NystromPreconditioner
@@ -134,7 +134,7 @@ function hvp_power(solver::GCKSolver)
     return 2
 end
 
-function GCKSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, quad_order::I=61, krylov_order::I=0) where {I<:Integer, T<:AbstractFloat}
+function GCKSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}, quad_order::I=10, krylov_order::I=0) where {I<:Integer, T<:AbstractFloat}
 
     #Quadrature
     nodes, weights = gausschebyshevt(quad_order)
@@ -163,7 +163,7 @@ function step!(solver::GCKSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
 
     #Quadrature scaling factor
     # β = eigmax(Hv, tol=1e-6)
-    β = eigmean(Hv)
+    β = eigmean(Hv)+λ 
 
     # println("β: ", β)
 
@@ -567,6 +567,61 @@ function step!(solver::ARCSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     cg_lanczos_shift!(solver.krylov_solver, Hv, -g, solver.shifts, itmax=solver.krylov_order, timemax=time_limit, check_curvature=true, atol=cg_atol, rtol=cg_rtol, callback=cb)
 
     push!(stats.krylov_iterations, solver.krylov_solver.stats.niter)
+
+    return
+end
+
+########################################################
+
+#=
+Lanczos tri-diagonal function approximation
+=#
+mutable struct LanczosFA{I<:Integer, T<:AbstractFloat, S<:AbstractVector{T}}
+    const rank::I #target rank
+    p::S #search direction
+end
+
+function hvp_power(solver::LanczosFA)
+    return 1
+end
+
+function LanczosFA(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}) where {I<:Integer, T<:AbstractFloat}
+    if dim≤10000
+        k = ceil(sqrt(dim))
+    else
+        k = ceil(log(dim))
+    end
+
+    r = Int(ceil(1.5*k))
+
+    return LanczosFA(r, type(undef, dim))
+end
+
+function step!(solver::LanczosFA, stats::Stats, Hv::H, g::S, g_norm::T, M::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
+
+    #Regularization
+    λ = max(min(1e15, M*g_norm), 1e-15)
+
+    #Hermitian Lanczos: Unitary tridiagonalization
+    Q, _, B = hermitian_lanczos(Hv, g, solver.rank)
+    Q = Q[:,1:solver.rank] #NOTE: do a view instead?
+    B = Tridiagonal(Matrix(B[1:solver.rank,:])) #NOTE: do a view instead? Also, ideally, the output of hermitian_lanczos would already be Julia tridiagonal and not sparsecsc
+
+    push!(stats.krylov_iterations, solver.rank) #NOTE: I think, could be OB1
+    
+    #Tridiagonal eigendecomposition
+    E = eigen(B)
+
+    #Temporary memory
+    cache1 = S(undef, solver.rank)
+    cache2 = S(undef, solver.rank)
+
+    #Update search direction
+    @. cache1 = pinv(sqrt(E.values^2+λ))*E.vectors[1,:]
+    mul!(cache2, E.vectors, cache1)
+    mul!(solver.p, Q, cache2)
+
+    solver.p *= -g_norm
 
     return
 end

@@ -117,7 +117,7 @@ function iterate!(opt::O, x::S, f::F1, fg!::F2, Hv::H, itmax::I, time_limit::T) 
 
         g2 = nothing #mark for collection
 
-        println("M Estimate: ", opt.M)
+        # println("M Estimate: ", opt.M)
     end
 
     #Tolerance
