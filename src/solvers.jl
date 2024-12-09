@@ -48,15 +48,7 @@ function step!(solver::LanczosFA, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     #Tridiagonal eigendecomposition
     E = eigen(B, sortby=x->abs(x))
 
-    #Check eigenvalues
-    r = findfirst(x->abs(x)≥λ, E.values)
-    if isnothing(r) #All eigenvalues are strictly less than regularization, seems unlikely
-        #
-    elseif r == 1 #All eigenvalues greater than or equal to reg.
-        solver.rank = min(100, 2*solver.rank) #increase rank
-    else #At least one eigenvalue strictly less than reg
-        solver.rank -= r-2 #decrease rank
-    end
+    r = findfirst(x->abs(x)≥λ, E.values) #check eigenvalues
 
     #Temporary memory, NOTE: Can you get away with just one of these?
     cache1 = S(undef, solver.rank)
@@ -68,6 +60,15 @@ function step!(solver::LanczosFA, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     mul!(solver.p, Q, cache2)
 
     solver.p *= -g_norm
+
+    #Update eigenvalues
+    if isnothing(r) #All eigenvalues are strictly less than regularization, seems unlikely
+        #
+    elseif r == 1 #All eigenvalues greater than or equal to reg.
+        solver.rank = min(100, 2*solver.rank) #increase rank
+    else #At least one eigenvalue strictly less than reg
+        solver.rank -= r-2 #decrease rank
+    end
 
     return
 end
