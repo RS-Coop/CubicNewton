@@ -14,6 +14,7 @@ Lanczos tri-diagonal function approximation
 =#
 mutable struct LanczosFA{I<:Integer, T<:AbstractFloat, S<:AbstractVector{T}}
     rank::I #target rank
+    const max_rank::I #maximum rank
     p::S #search direction
 end
 
@@ -30,7 +31,7 @@ function LanczosFA(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}) wher
 
     r = Int(ceil(1.5*k))
 
-    return LanczosFA(r, type(undef, dim))
+    return LanczosFA(min(dim, r), min(dim, 100), type(undef, dim))
 end
 
 function step!(solver::LanczosFA, stats::Stats, Hv::H, g::S, g_norm::T, M::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
@@ -40,10 +41,18 @@ function step!(solver::LanczosFA, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
 
     #Hermitian Lanczos: Unitary tridiagonalization
     Q, _, B = hermitian_lanczos(Hv, g, solver.rank)
-    Q = Q[:,1:solver.rank] #NOTE: do a view instead?
-    B = SymTridiagonal(Matrix(B[1:solver.rank,:])) #NOTE: do a view instead? Also, ideally, the output of hermitian_lanczos would already be Julia tridiagonal and not sparsecsc
 
     push!(stats.krylov_iterations, solver.rank) #NOTE: I think, could be OB1
+
+    Q = Q[:,1:solver.rank] #NOTE: do a view instead?
+    
+    #NOTE: This whole process isn't ideal
+    # do a view instead
+    # ideally the output of hermitian_lanczos would already be Julia tridiagonal and not sparsecsc
+    # ideally the output wouldn't have any Nans, or you could check for this in the conversion, or in Krylov
+    B = Matrix(B[1:solver.rank,:])
+    # B[isnan.(B)] .= 0.0 #Should we even be doing this
+    B = SymTridiagonal(B)
     
     #Tridiagonal eigendecomposition
     E = eigen(B, sortby=x->abs(x))
@@ -54,18 +63,18 @@ function step!(solver::LanczosFA, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     cache1 = S(undef, solver.rank)
     cache2 = S(undef, solver.rank)
 
-    #Update search direction
+    #Update search direction, NOTE: Should you include the update in the other part of the eigenspace
     @. cache1 = pinv(sqrt(E.values^2+λ))*E.vectors[1,:]
     mul!(cache2, E.vectors, cache1)
     mul!(solver.p, Q, cache2)
 
     solver.p *= -g_norm
 
-    #Update eigenvalues
+    #Update rank
     if isnothing(r) #All eigenvalues are strictly less than regularization, seems unlikely
         #
     elseif r == 1 #All eigenvalues greater than or equal to reg.
-        solver.rank = min(100, 2*solver.rank) #increase rank
+        solver.rank = min(solver.max_rank, 2*solver.rank) #increase rank
     else #At least one eigenvalue strictly less than reg
         solver.rank -= r-2 #decrease rank
     end
