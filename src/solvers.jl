@@ -63,21 +63,29 @@ function step!(solver::LanczosFA, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     cache1 = S(undef, solver.rank)
     cache2 = S(undef, solver.rank)
 
-    #Update search direction, NOTE: Should you include the update in the other part of the eigenspace
-    @. cache1 = pinv(sqrt(E.values^2+λ))*E.vectors[1,:]
+    #Update search direction
+    # @. cache1 = pinv(sqrt(E.values^2+λ))*E.vectors[1,:]
+    # mul!(cache2, E.vectors, cache1)
+    # mul!(solver.p, Q, cache2)
+
+    # solver.p *= -g_norm
+
+    #Update search direction, NOTE: Is this correct
+    @. cache1 = (pinv(sqrt(E.values^2+λ)) - pinv(sqrt(λ)))*E.vectors[1,:]
     mul!(cache2, E.vectors, cache1)
     mul!(solver.p, Q, cache2)
 
     solver.p *= -g_norm
+    solver.p .-= pinv(sqrt(λ))*g
 
     #Update rank
-    if isnothing(r) #All eigenvalues are strictly less than regularization, seems unlikely
-        #
-    elseif r == 1 #All eigenvalues greater than or equal to reg.
-        solver.rank = min(solver.max_rank, 2*solver.rank) #increase rank
-    else #At least one eigenvalue strictly less than reg
-        solver.rank -= r-2 #decrease rank
-    end
+    # if isnothing(r) #All eigenvalues are strictly less than regularization, seems unlikely
+    #     #
+    # elseif r == 1 #All eigenvalues greater than or equal to reg.
+    #     solver.rank = min(solver.max_rank, 2*solver.rank) #increase rank
+    # else #At least one eigenvalue strictly less than reg
+    #     solver.rank -= r-2 #decrease rank
+    # end
 
     return
 end
