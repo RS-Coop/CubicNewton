@@ -79,13 +79,13 @@ function step!(solver::LanczosFA, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     solver.p .-= pinv(sqrt(λ))*g
 
     #Update rank
-    # if isnothing(r) #All eigenvalues are strictly less than regularization, seems unlikely
-    #     #
-    # elseif r == 1 #All eigenvalues greater than or equal to reg.
-    #     solver.rank = min(solver.max_rank, 2*solver.rank) #increase rank
-    # else #At least one eigenvalue strictly less than reg
-    #     solver.rank -= r-2 #decrease rank
-    # end
+    if isnothing(r) #All eigenvalues are strictly less than regularization, seems unlikely
+        #
+    elseif r == 1 #All eigenvalues greater than or equal to reg.
+        solver.rank = min(solver.max_rank, 2*solver.rank) #increase rank
+    else #At least one eigenvalue strictly less than reg
+        solver.rank -= r-2 #decrease rank
+    end
 
     return
 end
