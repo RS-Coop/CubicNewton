@@ -29,7 +29,7 @@ function LanczosFA(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}) wher
         k = ceil(log(dim))
     end
 
-    r = Int(ceil(1.5*k))
+    r = Int(ceil(2*k))
 
     return LanczosFA(min(dim, r), min(dim, 100), type(undef, dim))
 end
@@ -50,27 +50,15 @@ function step!(solver::LanczosFA, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     # do a view instead
     # ideally the output of hermitian_lanczos would already be Julia tridiagonal and not sparsecsc
     # ideally the output wouldn't have any Nans, or you could check for this in the conversion, or in Krylov
-    B = Matrix(B[1:solver.rank,:])
-    # B[isnan.(B)] .= 0.0 #Should we even be doing this
-    B = SymTridiagonal(B)
-    
-    #Tridiagonal eigendecomposition
-    E = eigen(B, sortby=x->abs(x))
-
-    r = findfirst(x->abs(x)≥λ, E.values) #check eigenvalues
+    # sometimes there are NaNs
+    # sometimes get a LAPACK chklapackerror_positive(::Int64)
+    E = eigen(SymTridiagonal(Matrix(B[1:solver.rank,:])))
 
     #Temporary memory, NOTE: Can you get away with just one of these?
     cache1 = S(undef, solver.rank)
     cache2 = S(undef, solver.rank)
 
     #Update search direction
-    # @. cache1 = pinv(sqrt(E.values^2+λ))*E.vectors[1,:]
-    # mul!(cache2, E.vectors, cache1)
-    # mul!(solver.p, Q, cache2)
-
-    # solver.p *= -g_norm
-
-    #Update search direction, NOTE: Is this correct
     @. cache1 = (pinv(sqrt(E.values^2+λ)) - pinv(sqrt(λ)))*E.vectors[1,:]
     mul!(cache2, E.vectors, cache1)
     mul!(solver.p, Q, cache2)
@@ -79,13 +67,6 @@ function step!(solver::LanczosFA, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     solver.p .-= pinv(sqrt(λ))*g
 
     #Update rank
-    if isnothing(r) #All eigenvalues are strictly less than regularization, seems unlikely
-        #
-    elseif r == 1 #All eigenvalues greater than or equal to reg.
-        solver.rank = min(solver.max_rank, 2*solver.rank) #increase rank
-    else #At least one eigenvalue strictly less than reg
-        solver.rank -= r-2 #decrease rank
-    end
 
     return
 end

@@ -24,7 +24,7 @@ High-level interfaces
 =#
 
 #R-SFN
-function rsfn!(x::S, f::F; mode::Symbol, itmax::I, time_limit::T2, M::T1=NaN, atol::T2=1e-5, rtol::T2=1e-6, linesearch::Bool=false) where {T1<:Real, T2<:AbstractFloat, S<:AbstractVector{T2}, F, I}
+function rsfn!(x::S, f::F; mode::Symbol, itmax::I, time_limit::T2, M::T1=1e-8, atol::T2=1e-5, rtol::T2=1e-6, linesearch::Bool=false) where {T1<:Real, T2<:AbstractFloat, S<:AbstractVector{T2}, F, I}
 	opt = SFNOptimizer(size(x,1), mode, M=M, linesearch=linesearch, atol=atol, rtol=rtol)
 
 	stats = minimize!(opt, x, f, itmax=itmax, time_limit=time_limit)
