@@ -9,6 +9,7 @@ using Arpack: eigs
 using KrylovKit: eigsolve, Lanczos, KrylovDefaults
 using IterativeSolvers: lobpcg
 using RandomizedPreconditioners: NystromPreconditioner
+using Arpack: eigs
 
 ########################################################
 
@@ -20,23 +21,37 @@ mutable struct ArpackSolver{T<:AbstractFloat, I<:Integer, S<:AbstractVector{T}}
     p::S #search direction
 end
 
-function ArpackSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}) where {I<:Integer, T<:AbstractFloat}
-    # rank = Int(ceil(log(dim)))
-    rank = Int(ceil(sqrt(dim)))
-
-    return ArpackSolver(rank, type(undef, dim))
+function hvp_power(solver::ArpackSolver)
+    return 1
 end
 
-function step!(solver::ArpackSolver, stats::SFNStats, Hv::H, b::S, λ::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
-    solver.p .= 0
+function ArpackSolver(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}) where {I<:Integer, T<:AbstractFloat}
+    if dim≤10000
+        k = ceil(sqrt(dim))
+    else
+        k = ceil(log(dim))
+    end
 
-    D, V = eigs(Hv, nev=solver.rank, which=:LM, ritzvec=true)
+    return ArpackSolver(Int(k), type(undef, dim))
+end
 
-    @. D = pinv(sqrt(D^2+λ))
-    # mul!(solver.p, V', b)
-    # mul!(solver.p, Diagonal(D), solver.p)
-    # mul!(solver.p, V, solver.p)
-    mul!(solver.p, V*Diagonal(D)*V', b) #not the fastest way to do this
+function step!(solver::ArpackSolver, stats::Stats, Hv::H, g::S, g_norm::T, M::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
+
+    #Regularization
+    λ = max(min(1e15, M*g_norm), 1e-15)
+
+    #Eigendecomposition
+    D, V = eigs(Hv, nev=solver.rank, which=:LM, ritzvec=true, v0=g)
+
+    #Temporary memory, NOTE: Can you get away with just one of these?
+    cache = S(undef, solver.rank)
+
+    #Update search direction
+    mul!(cache, V', -g)
+    @. cache *= (pinv(sqrt(D^2+λ)) - pinv(sqrt(λ)))
+    mul!(solver.p, V, cache)
+
+    solver.p .-= pinv(sqrt(λ))*g
 
     return
 end

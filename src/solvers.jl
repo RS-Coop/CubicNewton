@@ -24,14 +24,12 @@ end
 
 function LanczosFA(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}) where {I<:Integer, T<:AbstractFloat}
     if dim≤10000
-        k = ceil(sqrt(dim))
+        k = Int(ceil(sqrt(dim)))
     else
-        k = ceil(log(dim))
+        k = Int(ceil(log(dim)))
     end
 
-    r = Int(ceil(2*k))
-
-    return LanczosFA(min(dim, r), min(dim, 100), type(undef, dim))
+    return LanczosFA(k, min(dim, 16*k), type(undef, dim))
 end
 
 function step!(solver::LanczosFA, stats::Stats, Hv::H, g::S, g_norm::T, M::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
@@ -67,6 +65,12 @@ function step!(solver::LanczosFA, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     solver.p .-= pinv(sqrt(λ))*g
 
     #Update rank
+    err = sqrt(abs((norm(Hv*solver.p)/g_norm)^2-1))
+    if err ≥ 1e-3
+        solver.rank *= 2
+    elseif err ≤ 1e-6
+        solver.rank /= 2
+    end
 
     return
 end
