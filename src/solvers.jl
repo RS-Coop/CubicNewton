@@ -15,6 +15,7 @@ Lanczos tri-diagonal function approximation
 mutable struct LanczosFA{I<:Integer, T<:AbstractFloat, S<:AbstractVector{T}}
     rank::I #target rank
     const max_rank::I #maximum rank
+    const min_rank::I #minimum rank
     p::S #search direction
 end
 
@@ -29,7 +30,7 @@ function LanczosFA(dim::I, type::Type{<:AbstractVector{T}}=Vector{Float64}) wher
         k = Int(ceil(log(dim)))
     end
 
-    return LanczosFA(k, min(dim, 16*k), type(undef, dim))
+    return LanczosFA(k, min(dim, 16*k), k, type(undef, dim))
 end
 
 function step!(solver::LanczosFA, stats::Stats, Hv::H, g::S, g_norm::T, M::T, time_limit::T) where {T<:AbstractFloat, S<:AbstractVector{T}, H<:HvpOperator}
@@ -67,9 +68,9 @@ function step!(solver::LanczosFA, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     #Update rank
     err = sqrt(abs((norm(Hv*solver.p)/g_norm)^2-1))
     if err ≥ 1e-3
-        solver.rank *= 2
+        solver.rank = min(solver.max_rank, 2*solver.rank)
     elseif err ≤ 1e-6
-        solver.rank /= 2
+        solver.rank = max(solver.min_rank, solver.rank/2)
     end
 
     return
