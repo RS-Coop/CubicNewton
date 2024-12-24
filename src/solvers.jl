@@ -54,7 +54,8 @@ function step!(solver::LanczosFA, stats::Stats, Hv::H, g::S, g_norm::T, M::T, ti
     # sometimes there are NaNs
     # sometimes get a LAPACK chklapackerror_positive(::Int64)
     # E = eigen(SymTridiagonal(Matrix(B[1:solver.rank,:]))) #Getting weird LAPACK errors mentioned above
-    E = eigen(Matrix(B[1:solver.rank,:]))
+    E = eigen(Tridiagonal(Matrix(B[1:solver.rank,:])))
+    # E = eigen(Matrix(B[1:solver.rank,:]))
 
     #Temporary memory, NOTE: Can you get away with just one of these?
     cache1 = S(undef, solver.rank)
